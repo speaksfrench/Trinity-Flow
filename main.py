@@ -1,4 +1,4 @@
-import hydrofunctons as hf, matplotlib.pyplot as plt, matplotlib.dates as mdates, numpy as np, statistics
+import hydrofunctions as hf, matplotlib.pyplot as plt, matplotlib.dates as mdates, numpy as np, statistics
 import matplotlib
 import humanize # makes stuff easier for humans to read
 matplotlib.use('TkAgg') # specify we need a GUI
