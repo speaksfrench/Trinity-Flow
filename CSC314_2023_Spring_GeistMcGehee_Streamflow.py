@@ -1,11 +1,11 @@
-import hydrofunctions as hf, matplotlib.pyplot as plt, matplotlib.dates as mdates, numpy as np, statistics
+import hydrofunctons as hf, matplotlib.pyplot as plt, matplotlib.dates as mdates, numpy as np, statistics
 import matplotlib
 import humanize # makes stuff easier for humans to read
 matplotlib.use('TkAgg') # specify we need a GUI
 from datetime import datetime, timedelta
 import argparse
 
-# NOTE: accounting for leap years gives me a dilemma -- either I start later or end later, but either way it looks weird. That or I ommit a day, which I don't want to.
+
 
 def main(args):
     plt.figure(figsize=(12, 7))
@@ -18,7 +18,7 @@ def main(args):
     # Get information from NWIS for every year in the last ten years
     # Download data
 
-    def is_leap_year(year):
+    def is_leap_year(year): # Account for leap years
         if year % 4 == 0:
             if year % 100 == 0:
                 if not year % 400 == 0:
@@ -27,23 +27,24 @@ def main(args):
         return False
 
 
+    # TODO: if this year is a leap year, and the data is from before/during that year's leap day, we have to increment leap count first. 
     count_leaps = 0 # count leap years
     for year in range(amount_of_years):
-        #leap = False
-        #if is_leap_year(year): leap = True
+        leap = False
+        if is_leap_year(year): leap = True
         #if leap and before_leap: count_leaps += 1 # if the current date is before leap day, we want to subtract an extra day from this year too, otherwise not
         
         if year > 0: 
-            begin_date = (anchor - timedelta(days=(365 * year) + 14 + count_leaps)).isoformat()       # `year` years in the past, accounting for the amount of leap years
-            end_date = (anchor - timedelta(days=(365 * year)) + timedelta(days=7)).isoformat()    # ending date is year years in the past and seven days into the future
+            begin_date = (anchor - timedelta(days=(365 * year) + 14 + count_leaps)) # `year` years in the past, accounting for the amount of leap years
+            end_date = (begin_date + timedelta(days=21))    # ending date is year years in the past and seven days into the future
         else: 
-            begin_date = (anchor - timedelta(days=14)).isoformat()
-            end_date = anchor.isoformat()                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
+            begin_date = (anchor - timedelta(days=14))
+            end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
         print(begin_date)
 
-        year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date, end_date=end_date, verbose=False)
+        year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
         data.append(year_raw)
-        #if leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
+        if leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
         #haiiii :3 - michael
 
     # Creates a list of dataframes of every NWIS data entry
@@ -60,7 +61,7 @@ def main(args):
         sum_flows.append(sum)
 
     # Find the max and min flow years
-    max_year_idx = sum_flows.index(max(sum_flows[1:])) # [1:] is to avoid the first year, not necessary in this case but avoids possible bugs
+    max_year_idx = sum_flows.index(max(sum_flows[1:])) # avoid the first year
     min_year_idx = sum_flows.index(min(sum_flows[1:]))
 
     # The "derivative"
@@ -73,6 +74,7 @@ def main(args):
 
     for year in dframes[1:]: # skip the current year
         for idx, entry in enumerate(year[column]): # appends every time frame to the appropriate time frame section
+            
             entries[idx].append(entry)
 
     means = list()
@@ -89,12 +91,6 @@ def main(args):
         stds.append(statistics.stdev(time))
         means.append(statistics.mean(time))
 
-    # df format:
-    #                            USGS:11527000:00060:00000
-    #datetimeUTC
-    #2021-03-26 04:15:00+00:00                     1030.0
-    #2021-03-26 04:30:00+00:00                     1030.0
-
     # Formats the dates
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     plt.gca().xaxis.set_major_locator(mdates.DayLocator())
@@ -102,28 +98,20 @@ def main(args):
     max_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[max_year_idx].index] # makes a list of every time in the max year and removes the year
     min_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[min_year_idx].index]
 
-
-
     # get x ticks based off month and year only
     x_ticks = list()
     for idx, i in enumerate(max_x_axis):
         if idx % 500 == 0:
             x_ticks.append(datetime.strptime(str(i)[5:10], "%m-%d"))
-
     plt.xticks(x_ticks) 
 
+    # Get the dataframe for each year
     curr_year = dframes[0]
     max_year = dframes[max_year_idx]
     min_year = dframes[min_year_idx]
 
-    # Create a range of dates
-    x_axis = np.arange(anchor - timedelta(days = 21), anchor, timedelta(days=1)).astype(datetime)
-    #plt.xticks(min(x_axis), max(x_axis))
-
     # Current
-    # TODO: current year starts not exactly at the right time
-
-    curr_date_ym = datetime.strptime(str(dframes[0].index[-1])[5:19],"%m-%d %H:%M:%S")
+    curr_date_ym = datetime.strptime(str(dframes[0].index[-1])[5:19],"%m-%d %H:%M:%S") # current year and month based on anchor
 
     # For some odd reason, the current year starts a litte bit earlier  than the other years. I really don't know why this is.
     plt.plot([datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[0].index], curr_year, 'k', label=f'Current year ({anchor.isoformat()[0:4]})')
