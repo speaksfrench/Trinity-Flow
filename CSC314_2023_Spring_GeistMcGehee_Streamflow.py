@@ -45,7 +45,6 @@ def main(args):
         year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
         data.append(year_raw)
         if leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
-        #haiiii :3 - michael
 
     # Creates a list of dataframes of every NWIS data entry
     dframes = list()
