@@ -1,7 +1,7 @@
 import hydrofunctions as hf, matplotlib.pyplot as plt, matplotlib.dates as mdates, numpy as np, statistics
 import matplotlib
 import humanize # makes stuff easier for humans to read
-matplotlib.use('TkAgg') # specify we need a GUI
+matplotlib.use('TkAgg') # specify GUI
 from datetime import datetime, timedelta
 import argparse
 
@@ -14,6 +14,7 @@ def main(args):
     data = list()
     amount_of_years = 10
     column = 'USGS:11527000:00060:00000'
+    leap_day = datetime(2000, 2, 29)
 
     # Get information from NWIS for every year in the last ten years
     # Download data
@@ -26,25 +27,32 @@ def main(args):
             return True
         return False
 
-
+    def is_before_leap_day(date):
+        if date.month <= leap_day.month:
+            if date.day <= leap_day.day:
+                return True
+        return False
+    
     # TODO: if this year is a leap year, and the data is from before/during that year's leap day, we have to increment leap count first. 
     count_leaps = 0 # count leap years
+    before_leap = is_before_leap_day(anchor - timedelta(days=14))
     for year in range(amount_of_years):
-        leap = False
-        if is_leap_year(year): leap = True
-        #if leap and before_leap: count_leaps += 1 # if the current date is before leap day, we want to subtract an extra day from this year too, otherwise not
+        curr_date = datetime(anchor.year - year, anchor.month, anchor.day)
+        if is_leap_year(curr_date.year) and before_leap: count_leaps += 1 # if the current date is before leap day, we want to subtract an extra day from this year too, otherwise not
         
+        begin_date = (anchor - timedelta(days=(365 * year) + 14 + count_leaps)) # `year` years in the past, accounting for the amount of leap years
+
         if year > 0: 
-            begin_date = (anchor - timedelta(days=(365 * year) + 14 + count_leaps)) # `year` years in the past, accounting for the amount of leap years
             end_date = (begin_date + timedelta(days=21))    # ending date is year years in the past and seven days into the future
         else: 
-            begin_date = (anchor - timedelta(days=14))
             end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
-        print(begin_date)
 
+        print('begin date:', begin_date)
+       #print('end date:', end_date)
+       #print('time difference:', end_date - begin_date)
         year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
         data.append(year_raw)
-        if leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
+        if is_leap_year(curr_date.year) and not before_leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
 
     # Creates a list of dataframes of every NWIS data entry
     dframes = list()
@@ -69,11 +77,14 @@ def main(args):
     derivative = (curr_flow1 - curr_flow2) * 4
 
     # Get the mean and stdev for every year
-    entries = [[] for i in range(len(dframes[1][column]))]
+    entries = [[] for i in range(2017)] # quick fix: sometimes a year has only 2013 entries, other times it has 2017 which throws IndexError
+
+    # testing
+    for i in dframes:
+        print(len(i[column]))
 
     for year in dframes[1:]: # skip the current year
         for idx, entry in enumerate(year[column]): # appends every time frame to the appropriate time frame section
-            
             entries[idx].append(entry)
 
     means = list()
@@ -130,8 +141,9 @@ def main(args):
         std_top_yvals.append(means[idx] + 0.5 * stds[idx])
         std_bottom_yvals.append(means[idx] - 0.5 * stds[idx])
 
-    plt.plot(max_x_axis, std_top_yvals, color='0.5', linestyle='--')
-    plt.plot(max_x_axis, std_bottom_yvals, color='0.5', linestyle='--')
+    # TODO: Make plot start on anchor day and not after 
+    plt.plot(min_x_axis, std_top_yvals, color='0.5', linestyle='--')
+    plt.plot(min_x_axis, std_bottom_yvals, color='0.5', linestyle='--')
     plt.gca().fill_between(max_x_axis, std_top_yvals, std_bottom_yvals, color='0.9')
 
     # Linear Regression 
