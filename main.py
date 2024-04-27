@@ -48,8 +48,8 @@ def main(args):
             end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
 
         print('begin date:', begin_date)
-       #print('end date:', end_date)
-       #print('time difference:', end_date - begin_date)
+        #print('end date:', end_date)
+
         year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
         data.append(year_raw)
         if is_leap_year(curr_date.year) and not before_leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
@@ -77,15 +77,14 @@ def main(args):
     derivative = (curr_flow1 - curr_flow2) * 4
 
     # Get the mean and stdev for every year
-    entries = [[] for i in range(2017)] # quick fix: sometimes a year has only 2013 entries, other times it has 2017 which throws IndexError
-
-    # testing
-    for i in dframes:
-        print(len(i[column]))
-
+    entries = list()
     for year in dframes[1:]: # skip the current year
         for idx, entry in enumerate(year[column]): # appends every time frame to the appropriate time frame section
-            entries[idx].append(entry)
+            try:
+                entries[idx].append(entry)
+            except IndexError: # if for some reason this array is too short, append another
+                entries.append([])
+                entries[idx].append(entry)
 
     means = list()
     stds = list()
@@ -144,7 +143,7 @@ def main(args):
     # TODO: Make plot start on anchor day and not after 
     plt.plot(min_x_axis, std_top_yvals, color='0.5', linestyle='--')
     plt.plot(min_x_axis, std_bottom_yvals, color='0.5', linestyle='--')
-    plt.gca().fill_between(max_x_axis, std_top_yvals, std_bottom_yvals, color='0.9')
+    plt.gca().fill_between(min_x_axis, std_top_yvals, std_bottom_yvals, color='0.9')
 
     # Linear Regression 
     current_year = dframes[0]
