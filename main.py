@@ -47,7 +47,7 @@ def main(args):
         else: 
             end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
 
-        print('begin date:', begin_date)
+        print('Fetching date range:', begin_date, 'to', end_date)
         #print('end date:', end_date)
 
         year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
@@ -104,9 +104,12 @@ def main(args):
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     plt.gca().xaxis.set_major_locator(mdates.DayLocator())
 
-    max_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[max_year_idx].index] # makes a list of every time in the max year and removes the year
-    min_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[min_year_idx].index]
-
+    try:
+        max_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[max_year_idx].index] # makes a list of every time in the max year and removes the year
+        min_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[min_year_idx].index]
+    except ValueError:
+        print('Error: DateTime does not consider February 29th (leap day) a valid date, even in the case of a leap year. Your anchor date {0} is either within two weeks after leap day or one week before.'.format(anchor))
+        quit()
     # get x ticks based off month and year only
     x_ticks = list()
     for idx, i in enumerate(max_x_axis):
@@ -123,13 +126,15 @@ def main(args):
     curr_date_ym = datetime.strptime(str(dframes[0].index[-1])[5:19],"%m-%d %H:%M:%S") # current year and month based on anchor
 
     # For some odd reason, the current year starts a litte bit earlier  than the other years. I really don't know why this is.
-    plt.plot([datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[0].index], curr_year, 'k', label=f'Current year ({anchor.isoformat()[0:4]})')
+    plt.plot([datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[0].index], curr_year, 'k', label=f'Anchor year ({anchor.isoformat()[0:4]})')
 
     # Max
-    plt.plot(max_x_axis, max_year, 'g', label=f'Max year ({(anchor - timedelta(days = max_year_idx * 365)).isoformat()[0:4]})')
+    max_year_date = (anchor - timedelta(days = max_year_idx * 365)).isoformat()[0:4]
+    plt.plot(max_x_axis, max_year, 'g', label=f'Max year ({max_year_date})')
 
     # Minimum
-    plt.plot(min_x_axis, min_year, 'b', label=f'Min year ({(anchor - timedelta(days = min_year_idx * 365)).isoformat()[0:4]})')
+    min_year_date = (anchor - timedelta(days = min_year_idx * 365)).isoformat()[0:4]
+    plt.plot(min_x_axis, min_year, 'b', label=f'Min year ({min_year_date})')
 
     # STDev top
     # Y-vals
@@ -153,7 +158,15 @@ def main(args):
     x_bar = statistics.mean(x_vals)
     y_bar = statistics.mean(y_vals)
     x_std = statistics.stdev(x_vals)
-    y_std = statistics.stdev(y_vals)
+    
+    try:
+        y_std = statistics.stdev(y_vals)
+    except AttributeError: # TODO: Fix: for some dates, NWIS has NaN values. If I just remove those from the data, my axis will be off.
+        print('NWIS\'s data for that time frame is flawed. Try another date.')
+        quit()
+    #finally:
+        #print(y_vals)
+
 
     total = 0.0
     for i in range(len(x_vals)): # yes, I did not use dataframes for this. it seemed easier without them, as using dataframes also returns a dataframe for r, which seems impractical and confusing
@@ -171,7 +184,7 @@ def main(args):
     regression_yvals = [i * slope + x_start for i in range(len(regression_xvals))]
 
 
-    plt.axvline(x = curr_date_ym, color = 'r', linestyle = '--', label='{0}'.format(str(anchor)[5:16])) # converts the current date to m/y and plots a line on that date (marks the beginning of the regression)
+    plt.axvline(x = curr_date_ym, color = 'r', linestyle = '--', label='{0}'.format(str(anchor)[5:10])) # converts the current date to m/y and plots a line on that date (marks the beginning of the regression)
     plt.plot(regression_xvals, regression_yvals, color = 'k')
 
     plt.legend(loc="upper left")
@@ -186,6 +199,10 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Graphs the maximum, minimum, current, and average flow of the Trinity River over the past 10 years.')
-    parser.add_argument('anchor', metavar='anchor', type=str, help='Usage: <time> (YYYY-MM-DD)', default=str(datetime.now().isoformat()))  
-    args = parser.parse_args()
+    parser.add_argument('anchor', metavar='anchor', type=str, help='Usage: main.py <time> (YYYY-MM-DD)', default=str(datetime.now().isoformat()))  
+    try:
+        args = parser.parse_args()
+    except:
+        print('Usage: main.py <time> (YYYY-MM-DD)')
+        quit()
     main(args)
