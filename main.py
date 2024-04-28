@@ -22,41 +22,17 @@ def main(args):
 
     # Get information from NWIS for every year in the last ten years
     # Download data
-
-    def is_leap_year(year): # Account for leap years
-        if year % 4 == 0:
-            if year % 100 == 0:
-                if not year % 400 == 0:
-                    return False
-            return True
-        return False
-
-    def is_before_leap_day(date):
-        if date.month <= leap_day.month:
-            if date.day <= leap_day.day:
-                return True
-        return False
-    
-    # TODO: if this year is a leap year, and the data is from before/during that year's leap day, we have to increment leap count first. 
-    count_leaps = 0 # count leap years
-    before_leap = is_before_leap_day(anchor - timedelta(days=14))
     for year in range(amount_of_years):
-        curr_date = datetime(anchor.year - year, anchor.month, anchor.day)
-        if is_leap_year(curr_date.year) and before_leap: count_leaps += 1 # if the current date is before leap day, we want to subtract an extra day from this year too, otherwise not
-        
-        begin_date = (anchor - timedelta(days=(365 * year) + 14 + count_leaps)) # `year` years in the past, accounting for the amount of leap years
-
+        begin_date = datetime(anchor.year - year, anchor.month, anchor.day - 14)
         if year > 0: 
             end_date = (begin_date + timedelta(days=21))    # ending date is year years in the past and seven days into the future
         else: 
             end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
 
         print('Fetching date range:', begin_date, 'to', end_date)
-        #print('end date:', end_date)
 
         year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
         data.append(year_raw)
-        if is_leap_year(curr_date.year) and not before_leap: count_leaps += 1 # if the end_date is after leap day, we don't want this year to account for its own leap day, so we only increment count_leaps for the next year
 
     # Creates a list of dataframes of every NWIS data entry
     dframes = list()
