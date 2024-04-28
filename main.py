@@ -23,7 +23,7 @@ def main(args):
     # Get information from NWIS for every year in the last ten years
     # Download data
     for year in range(amount_of_years):
-        begin_date = datetime(anchor.year - year, anchor.month, anchor.day - 14)
+        begin_date = datetime(anchor.year - year, anchor.month, anchor.day) - timedelta(days=14)
         if year > 0: 
             end_date = (begin_date + timedelta(days=21))    # ending date is year years in the past and seven days into the future
         else: 
@@ -169,6 +169,7 @@ def main(args):
     plt.axvline(x = curr_date_ym, color = 'r', linestyle = '--', label='{0}'.format(str(anchor)[5:10])) # converts the current date to m/y and plots a line on that date (marks the beginning of the regression)
     plt.plot(regression_xvals, regression_yvals, color = 'k')
 
+    # Plot titling
     plt.legend(loc="upper left")
     plt.suptitle('Trinity River at Hoopa (CFS)', fontsize=20)
 
