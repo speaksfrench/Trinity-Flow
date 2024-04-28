@@ -5,6 +5,10 @@ matplotlib.use('TkAgg') # specify GUI
 from datetime import datetime, timedelta
 import argparse
 
+# TODO:
+# 2023-09-27 has the same min/max line
+# Anything containing February 29th does not work (thanks to DateTime)
+# Incomplete data causes a complete crash, find fix (?)
 
 
 def main(args):
@@ -146,9 +150,14 @@ def main(args):
         std_bottom_yvals.append(means[idx] - 0.5 * stds[idx])
 
     # TODO: Make plot start on anchor day and not after 
+    # Average fill
     plt.plot(min_x_axis, std_top_yvals, color='0.5', linestyle='--')
     plt.plot(min_x_axis, std_bottom_yvals, color='0.5', linestyle='--')
     plt.gca().fill_between(min_x_axis, std_top_yvals, std_bottom_yvals, color='0.9')
+
+    # Mean graph
+    plt.plot(min_x_axis, means, color='w', linestyle='dashdot', label='Mean')
+
 
     # Linear Regression 
     current_year = dframes[0]
@@ -159,14 +168,12 @@ def main(args):
     y_bar = statistics.mean(y_vals)
     x_std = statistics.stdev(x_vals)
     
+    # TODO: Fix: for some dates, NWIS has NaN values. If I just remove those from the data, my axis will be off.
     try:
         y_std = statistics.stdev(y_vals)
-    except AttributeError: # TODO: Fix: for some dates, NWIS has NaN values. If I just remove those from the data, my axis will be off.
-        print('NWIS\'s data for that time frame is flawed. Try another date.')
+    except AttributeError: 
+        print('NWIS\'s database is missing entries for that timeframe. Try another anchor date.')
         quit()
-    #finally:
-        #print(y_vals)
-
 
     total = 0.0
     for i in range(len(x_vals)): # yes, I did not use dataframes for this. it seemed easier without them, as using dataframes also returns a dataframe for r, which seems impractical and confusing
@@ -182,7 +189,6 @@ def main(args):
     x_start = dframes[0][column].iloc[-1] # the final value of the current year (the y-intercept of the regression line)
     regression_xvals = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in np.arange(anchor + timedelta(days=0.25), regression_end_date, timedelta(days=increment)).astype(datetime)] # oddly enough, we have to start the regression line 0.25 days after the current date
     regression_yvals = [i * slope + x_start for i in range(len(regression_xvals))]
-
 
     plt.axvline(x = curr_date_ym, color = 'r', linestyle = '--', label='{0}'.format(str(anchor)[5:10])) # converts the current date to m/y and plots a line on that date (marks the beginning of the regression)
     plt.plot(regression_xvals, regression_yvals, color = 'k')
