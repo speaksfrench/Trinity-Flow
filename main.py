@@ -8,7 +8,7 @@ import argparse
 # TODO:
 # 2023-09-27 has the same min/max line
 # Anything containing February 29th does not work (thanks to DateTime)
-# Incomplete data causes a complete crash, find fix (?)
+# Incomplete data causes a complete crash, find fix (?) e.g. 2019-08-27 - Currently working, NaN values are replaced with the last entry
 
 
 def main(args):
@@ -137,8 +137,11 @@ def main(args):
 
     # Linear Regression 
     current_year = dframes[0]
-    x_vals = [idx for idx, i in enumerate(current_year.index)] # to_numeric does not make them reasonable indices, but in fact large integers
-    y_vals = list(dframes[0][column])
+    x_vals = [idx for idx, i in enumerate(current_year.index)]
+
+    # If a NaN value is found, replaces entry with last valid data. 
+    # The logic behind this is that two points are probably not that far off from each other, so a missing point is probably similar to the last entry.
+    y_vals = [it if not np.isnan(it) else dframes[0][column].iloc[idx - 1] for idx, it in enumerate(dframes[0][column])] 
 
     x_bar = statistics.mean(x_vals)
     y_bar = statistics.mean(y_vals)
