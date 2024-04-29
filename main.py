@@ -6,16 +6,14 @@ from datetime import datetime, timedelta
 import argparse
 
 # TODO:
-# 2023-09-27 has the same min/max line
-# Anything containing February 29th does not work (thanks to DateTime)
-# Incomplete data causes a complete crash, find fix (?) e.g. 2019-08-27 - Currently working, NaN values are replaced with the last entry
-
+# 2023-09-27 has the same min/max line (?)
+# If leap year is in date range, code runs but end date is off by one
 
 def main(args):
     plt.figure(figsize=(12, 7))
     trinity_burnt_ranch_id = '11527000'
     anchor = datetime.strptime(str(args.anchor), '%Y-%m-%d')
-    data = list()
+    data = []
     amount_of_years = 10
     column = 'USGS:11527000:00060:00000'
     leap_day = datetime(2000, 2, 29)
@@ -23,9 +21,12 @@ def main(args):
     # Get information from NWIS for every year in the last ten years
     # Download data
     for year in range(amount_of_years):
-        begin_date = datetime(anchor.year - year, anchor.month, anchor.day) - timedelta(days=14)
+        curr_year = anchor.year - year
+        begin_date = datetime(curr_year, anchor.month, anchor.day) - timedelta(days=14)
         if year > 0: 
-            end_date = (begin_date + timedelta(days=21))    # ending date is year years in the past and seven days into the future
+            end_date = (datetime(curr_year, anchor.month, anchor.day) + timedelta(days=7))    # ending date is year years in the past and seven days into the future
+            if end_date.month == leap_day.month and end_date.day == leap_day.day: # Prevents data from ending on leap day
+                end_date += timedelta(days=1) 
         else: 
             end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
 
@@ -35,12 +36,22 @@ def main(args):
         data.append(year_raw)
 
     # Creates a list of dataframes of every NWIS data entry
-    dframes = list()
+    dframes = []
     for i in data:
         dframes.append(i.df('discharge')[:])
 
+    cleaned_dfs = [] # Remove leap day from every dataframe
+    for dframe in dframes:
+        to_cut = []
+        for index in dframe.index:
+            if str(index)[5:10] == '02-29': # Datetime doesn't recognize timestamp leap year days as valid, so skip them
+                to_cut.append(index)
+        cleaned_dframe = dframe.drop(to_cut)
+        cleaned_dfs.append(cleaned_dframe)
+    dframes = cleaned_dfs
+
     # Calculate the average flows for each year
-    sum_flows = list()
+    sum_flows = []
     for i in dframes: # iterates through every dataframe 
         sum = 0
         for ii in i[column]:
@@ -57,7 +68,7 @@ def main(args):
     derivative = (curr_flow1 - curr_flow2) * 4
 
     # Get the mean and stdev for every year
-    entries = list()
+    entries = []
     for year in dframes[1:]: # skip the current year
         for idx, entry in enumerate(year[column]): # appends every time frame to the appropriate time frame section
             try:
@@ -66,11 +77,11 @@ def main(args):
                 entries.append([])
                 entries[idx].append(entry)
 
-    means = list()
-    stds = list()
+    means = []
+    stds = []
     for time in entries:
         if np.isnan(time).any(): # makes sure there are no NaN values 
-            temp = list()
+            temp = []
             for i in time: # in the case of a NaN value, just create a new array without the NaN and move on.
                 if not np.isnan(i):
                     temp.append(i)
@@ -84,14 +95,12 @@ def main(args):
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     plt.gca().xaxis.set_major_locator(mdates.DayLocator())
 
-    try:
-        max_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[max_year_idx].index] # makes a list of every time in the max year and removes the year
-        min_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[min_year_idx].index]
-    except ValueError:
-        print('Error: DateTime does not consider February 29th (leap day) a valid date, even in the case of a leap year. Your anchor date {0} is either within two weeks after leap day or one week before.'.format(anchor))
-        quit()
+
+    max_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[max_year_idx].index] # Used to be code to account for Leap Years, but they have been removed
+    min_x_axis = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[min_year_idx].index]
+            
     # get x ticks based off month and year only
-    x_ticks = list()
+    x_ticks = []
     for idx, i in enumerate(max_x_axis):
         if idx % 500 == 0:
             x_ticks.append(datetime.strptime(str(i)[5:10], "%m-%d"))
@@ -118,8 +127,8 @@ def main(args):
 
     # STDev top
     # Y-vals
-    std_top_yvals = list()
-    std_bottom_yvals = list()
+    std_top_yvals = []
+    std_bottom_yvals = []
 
     for idx, i in enumerate(means):
         std_top_yvals.append(means[idx] + 0.5 * stds[idx])
