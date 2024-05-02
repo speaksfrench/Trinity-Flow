@@ -123,8 +123,6 @@ def main(args):
     max_year_date = (anchor - timedelta(days = max_year_idx * 365)).isoformat()[0:4]
     plt.plot(max_x_axis, max_year, 'g', label=f'Max year ({max_year_date})')
 
-    print(max_x_axis[-1])
-
     # Minimum
     min_year_date = (anchor - timedelta(days = min_year_idx * 365)).isoformat()[0:4]
     plt.plot(min_x_axis, min_year, 'b', label=f'Min year ({min_year_date})')
@@ -159,7 +157,6 @@ def main(args):
     y_bar = statistics.mean(y_vals)
     x_std = statistics.stdev(x_vals)
     
-    # TODO: Fix: for some dates, NWIS has NaN values. If I just remove those from the data, my axis will be off.
     try:
         y_std = statistics.stdev(y_vals)
     except AttributeError: 
@@ -180,8 +177,6 @@ def main(args):
     x_start = dframes[0][column].iloc[-1] # the final value of the current year (the y-intercept of the regression line)
     regression_xvals = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in np.arange(anchor + timedelta(days=1/3), regression_end_date + timedelta(days=1/3), timedelta(days=increment)).astype(datetime)] # oddly enough, we have to start the regression line 0.25 days after the current date
     regression_yvals = [i * slope + x_start for i in range(len(regression_xvals))]
-    print("regression: ", regression_xvals[0], regression_xvals[-1])
-    print('current year end: ', curr_year_xvals[-1])
 
     plt.axvline(x = curr_date_ym, color = 'r', linestyle = '--', label='{0}'.format(str(anchor)[5:10])) # converts the current date to m/y and plots a line on that date (marks the beginning of the regression)
     plt.plot(regression_xvals, regression_yvals, color = 'k')
