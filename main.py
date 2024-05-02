@@ -8,6 +8,7 @@ import argparse
 # TODO:
 # 2023-09-27 has the same min/max line (?)
 # If leap year is in date range, code runs but end date is off by one
+# Regression line on leap year doesn't work 
 
 def main(args):
     plt.figure(figsize=(12, 7))
@@ -30,9 +31,11 @@ def main(args):
         else: 
             end_date = anchor                                                        # if year = 0, then it is the anchor year and we cannot go 7 days in the future
 
-        print('Fetching date range:', begin_date, 'to', end_date)
-
-        year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
+        try:
+            year_raw = hf.NWIS(trinity_burnt_ranch_id, 'iv', start_date=begin_date.isoformat(), end_date=end_date.isoformat(), verbose=False)
+            print('Fetching date range:', begin_date, 'to', end_date)
+        except hf.exceptions.HydroNoDataError:
+            continue
         data.append(year_raw)
 
     # Creates a list of dataframes of every NWIS data entry
@@ -113,13 +116,14 @@ def main(args):
 
     # Current
     curr_date_ym = datetime.strptime(str(dframes[0].index[-1])[5:19],"%m-%d %H:%M:%S") # current year and month based on anchor
-
-    # For some odd reason, the current year starts a litte bit earlier  than the other years. I really don't know why this is.
-    plt.plot([datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[0].index], curr_year, 'k', label=f'Anchor year ({anchor.isoformat()[0:4]})')
+    curr_year_xvals = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in dframes[0].index]
+    plt.plot(curr_year_xvals, curr_year, 'k', label=f'Anchor year ({anchor.isoformat()[0:4]})')
 
     # Max
     max_year_date = (anchor - timedelta(days = max_year_idx * 365)).isoformat()[0:4]
     plt.plot(max_x_axis, max_year, 'g', label=f'Max year ({max_year_date})')
+
+    print(max_x_axis[-1])
 
     # Minimum
     min_year_date = (anchor - timedelta(days = min_year_idx * 365)).isoformat()[0:4]
@@ -134,7 +138,6 @@ def main(args):
         std_top_yvals.append(means[idx] + 0.5 * stds[idx])
         std_bottom_yvals.append(means[idx] - 0.5 * stds[idx])
 
-    # TODO: Make plot start on anchor day and not after 
     # Average fill
     plt.plot(min_x_axis, std_top_yvals, color='0.5', linestyle='--')
     plt.plot(min_x_axis, std_bottom_yvals, color='0.5', linestyle='--')
@@ -175,8 +178,10 @@ def main(args):
     # 1) creates an arange of values starting from the current date and going 7 days into the future then 2) removes the year from all of those values
     increment = 1 / 24 / 60 * 15 # 15-minute increment
     x_start = dframes[0][column].iloc[-1] # the final value of the current year (the y-intercept of the regression line)
-    regression_xvals = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in np.arange(anchor + timedelta(days=0.25), regression_end_date, timedelta(days=increment)).astype(datetime)] # oddly enough, we have to start the regression line 0.25 days after the current date
+    regression_xvals = [datetime.strptime(str(i)[5:19], "%m-%d %H:%M:%S") for i in np.arange(anchor + timedelta(days=1/3), regression_end_date + timedelta(days=1/3), timedelta(days=increment)).astype(datetime)] # oddly enough, we have to start the regression line 0.25 days after the current date
     regression_yvals = [i * slope + x_start for i in range(len(regression_xvals))]
+    print("regression: ", regression_xvals[0], regression_xvals[-1])
+    print('current year end: ', curr_year_xvals[-1])
 
     plt.axvline(x = curr_date_ym, color = 'r', linestyle = '--', label='{0}'.format(str(anchor)[5:10])) # converts the current date to m/y and plots a line on that date (marks the beginning of the regression)
     plt.plot(regression_xvals, regression_yvals, color = 'k')
